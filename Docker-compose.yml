@@ -29,20 +29,5 @@ services:
         - action: sync
           path: ./src
           target: /app/src
-
-  studio:
-    image: node:22-alpine
-    container_name: mindplex_semantic_studio
-    volumes:
-      - .:/app
-    environment:
-      DATABASE_URL: postgres://mindplex:mindplex@db:5432/semantic
-    ports:
-      - "5555:5555"
-      
-    command: sh -c "npx prisma studio --config ./app/prisma.config.ts  --browser none --port 5555"
-    depends_on:
-      db:
-        condition: service_healthy
 volumes:
   pgdata:
