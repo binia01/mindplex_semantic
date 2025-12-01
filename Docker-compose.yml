@@ -1,0 +1,48 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: mindplex
+      POSTGRES_PASSWORD: mindplex
+      POSTGRES_DB: semantic
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mindplex -d semantic"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://mindplex:mindplex@db:5432/semantic
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+
+  studio:
+    image: node:22-alpine
+    container_name: mindplex_semantic_studio
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: postgres://mindplex:mindplex@db:5432/semantic
+    ports:
+      - "5555:5555"
+      
+    command: sh -c "npx prisma studio --config ./app/prisma.config.ts  --browser none --port 5555"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  pgdata:
