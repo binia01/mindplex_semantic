@@ -108,6 +108,7 @@ ingest.post('/users', async (c) => {
             searchName,
             email: userData.email
         })
+        return c.json({ success: true })
     } catch (error) {
         console.error('User ingest failed:', error)
         return c.json({ success: false, error: 'Internal error' }, 500)
