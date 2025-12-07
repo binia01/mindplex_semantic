@@ -15,6 +15,13 @@
       "when": 1765021645417,
       "tag": "0001_equal_mauler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765098590444,
+      "tag": "0002_rich_gravity",
+      "breakpoints": true
     }
   ]
 }

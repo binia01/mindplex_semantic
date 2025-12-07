@@ -86,3 +86,12 @@ export interface PostData {
     filter: string,
     origin_resource: string
 }
+
+export interface UserData {
+    id: number,
+    firstName: string,
+    lastName: string,
+    username: string,
+    email: string,
+    searchName?: string,
+}

@@ -45,6 +45,7 @@ export const users = pgTable('users', {
     lastName: text('last_name').notNull(),
     username: text('username').notNull(),
     searchName: text('search_name').notNull(),
+    email: text('email'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 }, (table) => [
     index('users_search_name_trgm_idx').using('gin', sql`${table.searchName} gin_trgm_ops`)

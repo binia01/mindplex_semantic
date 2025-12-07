@@ -1,13 +1,13 @@
 import { Hono } from 'hono'
 import { Chunk } from '$src/lib/Chunk'
 import { Embedding } from '$src/lib/Embedding'
-import { AppContext, PostData } from '$src/types'
+import { AppContext, PostData, UserData } from '$src/types'
 import { toNames } from '$src/utils'
 import { eq } from 'drizzle-orm'
 
 const ingest = new Hono<AppContext>()
 
-ingest.post('/', async (c) => {
+ingest.post('/articles', async (c) => {
     const body = await c.req.json()
     const db = c.get('db');
     const schema = c.get('schema')
@@ -72,10 +72,45 @@ ingest.post('/', async (c) => {
         if (error.name === 'BedrockError' || error.message?.includes('Bedrock')) {
             return c.json({ success: false, error: 'Embedding service failed' }, 502)
         }
-
         return c.json({ success: false, error: 'Internal error' }, 500)
     }
-
 })
 
+
+ingest.post('/users', async (c) => {
+    const body = await c.req.json()
+    const db = c.get('db');
+    const schema = c.get('schema')
+
+    const userData = body as UserData
+
+    try {
+        const existing = await db
+            .select({ id: schema.users.id })
+            .from(schema.users)
+            .where(eq(schema.users.externalId, userData.id))
+            .limit(1)
+
+        if (existing.length > 0) {
+            return c.json({ success: false, error: 'User already exists' }, 409)
+        }
+
+        const searchName = [userData.firstName, userData.lastName, userData.username, userData.email]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+
+        await db.insert(schema.users).values({
+            externalId: userData.id,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            username: userData.username,
+            searchName,
+            email: userData.email
+        })
+    } catch (error) {
+        console.error('User ingest failed:', error)
+        return c.json({ success: false, error: 'Internal error' }, 500)
+    }
+})
 export default ingest 
