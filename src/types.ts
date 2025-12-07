@@ -8,7 +8,6 @@ export type AppContext = {
     };
 };
 
-
 export interface ParsedNode {
     tag: string
     text: string
@@ -26,65 +25,21 @@ export interface ContentChunk {
 
 export interface PostData {
     ID: number,
-    post_author: string,
     post_date: string,
-    post_date_gmt: string,
     post_content: string
-    about_the_author: {
-        author_role: string,
-        author_bio: string
-    }[],
     brief_overview: string,
     tag: {
-        term_id: number,
         name: string,
-        slug: string,
-        term_group: number,
-        term_taxonomy_id: number,
-        taxonomy: string,
-        description: string,
-        parent: number,
-        count: number,
-        filter: string
     } | [],
     category: {
-        term_id: number,
         name: string,
-        slug: string,
-        term_group: number,
-        term_taxonomy_id: number,
-        taxonomy: string,
-        description: string,
-        parent: number,
-        count: number,
-        filter: string,
-        cat_ID: number,
-        category_count: number,
-        category_description: string,
-        cat_name: string,
-        category_nicename: string,
-        category_parent: number
     } | [],
     post_title: string,
-    post_excerpt: string,
-    post_status: string,
-    comment_status: string,
-    ping_status: string,
-    post_password: string,
     post_name: string,
-    to_ping: string,
-    pinged: string,
-    post_modified: string,
-    post_modified_gmt: string,
-    post_content_filtered: string,
-    post_parent: number,
-    guid: string,
-    menu_order: number,
-    post_type: string,
-    post_mime_type: string,
-    comment_count: string,
-    filter: string,
-    origin_resource: string
+    other_authors: [],
+    co_authors: [],
+    post_editors: [],
+    author_name: string,
 }
 
 export interface UserData {
