@@ -18,7 +18,7 @@ jobs:
                   git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
                   dagger call \
-                    --mod github.com/Xcceleran-do/mindplex_infra@main \
+                    --mod github.com/Xcceleran-do/mindplex_infra/dagger@main \
                     semantic deploy \
                     --source . \
                     --env dev \
