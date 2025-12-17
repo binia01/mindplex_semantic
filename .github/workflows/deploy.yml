@@ -37,19 +37,70 @@ on:
         branches: [main, develop]
     pull_request:
 
+permissions:
+    contents: read
+    pull-requests: write
+
 jobs:
     deploy:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
 
+            - name: Set Environment Context
+              id: context
+              run: |
+                  if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+                    echo "ENV_NAME=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+                    echo "URL=https://pr-${{ github.event.number }}-search.mindplex.ai" >> $GITHUB_OUTPUT
+                  else
+                    echo "ENV_NAME=dev" >> $GITHUB_OUTPUT
+                    echo "URL=https://dev-search.mindplex.ai" >> $GITHUB_OUTPUT
+                  fi
+
             - uses: dagger/dagger-for-github@v6
+              id: dagger
               with:
                   version: "latest"
                   verb: call
                   module: github.com/Xcceleran-do/mindplex_infra/dagger@main
-                  args: semantic deploy --source . --env dev --aws-access-key env:AWS_ACCESS_KEY_ID --aws-secret-key env:AWS_SECRET_ACCESS_KEY
-                  cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+                  args: >
+                      semantic deploy 
+                      --source . 
+                      --env ${{ steps.context.outputs.ENV_NAME }} 
+                      --aws-access-key env:AWS_ACCESS_KEY_ID 
+                      --aws-secret-key env:AWS_SECRET_ACCESS_KEY
+
               env:
                   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
                   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+            - name: Comment Success
+              uses: marocchino/sticky-pull-request-comment@v2
+              if: success() && github.event_name == 'pull_request'
+              with:
+                  header: deployment-status
+                  message: |
+                      ### Deployment Successful!
+
+                      | App | Environment | URL |
+                      |:---:|:---:|:---:|
+                      | **Semantic Search** | `${{ steps.context.outputs.ENV_NAME }}` | [**Visit Preview**](${{ steps.context.outputs.URL }}) |
+
+                      *Build: ${{ github.sha }}*
+
+            - name: Comment Failure
+              uses: marocchino/sticky-pull-request-comment@v2
+              if: failure() && github.event_name == 'pull_request'
+              with:
+                  header: deployment-status
+                  message: |
+                      ### Deployment Failed
+
+                      | App | Environment | Status |
+                      |:---:|:---:|:---:|
+                      | **Semantic Search** | `${{ steps.context.outputs.ENV_NAME }}` | **CRASHED**  |
+
+                      **Debug Here:**
+                      1. [View GitHub Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                      2. [View Dagger Trace](https://dagger.cloud/traces) (Requires Login)
