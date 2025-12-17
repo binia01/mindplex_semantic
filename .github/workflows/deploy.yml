@@ -19,17 +19,21 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Determine Tag
+            - name: Determine Tag & Environment
               id: vars
               run: |
                   if [ "${{ github.event_name }}" == "pull_request" ]; then
                     TAG="pr-${{ github.event.pull_request.number }}-${GITHUB_SHA:0:7}"
+                    ENV="pr-${{ github.event.pull_request.number }}"
                   elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
                     TAG="${GITHUB_SHA:0:7}"
+                    ENV="prod"
                   else
                     TAG="dev-${GITHUB_SHA:0:7}"
+                    ENV="dev"
                   fi
                   echo "tag=${TAG}" >> $GITHUB_OUTPUT
+                  echo "environment=${ENV}" >> $GITHUB_OUTPUT
 
             - name: Configure AWS
               uses: aws-actions/configure-aws-credentials@v4
@@ -49,14 +53,14 @@ jobs:
                   docker push 521520215337.dkr.ecr.us-east-1.amazonaws.com/mindplex-semantic:${{ steps.vars.outputs.tag }}
                   echo "Image pushed: ${{ steps.vars.outputs.tag }}"
 
-            - name: Trigger Deploy (only on main/develop push)
+            - name: Trigger Deploy (only on push to main/develop)
               if: github.event_name == 'push'
               run: |
                   curl -X POST \
                     -H "Authorization: token ${{ secrets.INFRA_REPO_PAT }}" \
                     -H "Accept: application/vnd.github.v3+json" \
-                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/dispatches \
-                    -d '{"event_type":"deploy","client_payload":{"tag":"${{ steps.vars.outputs.tag }}"}}'
+                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/actions/workflows/digger.yml/dispatches \
+                    -d "{\"ref\":\"main\",\"inputs\":{\"environment\":\"${{ steps.vars.outputs.environment }}\",\"image_tag\":\"${{ steps.vars.outputs.tag }}\",\"action\":\"apply\"}}"
 
     preview:
         if: |
@@ -80,24 +84,23 @@ jobs:
 
             - name: Trigger Preview Deployment
               run: |
-                  TAG="pr-${{ steps.pr.outputs.number }}-${{ steps.pr.outputs.sha }}"
-                  TAG="${TAG:0:50}"
+                  TAG="pr-${{ steps.pr.outputs.number }}-$(echo ${{ steps.pr.outputs.sha }} | cut -c1-7)"
+                  ENV="pr-${{ steps.pr.outputs.number }}"
 
                   curl -X POST \
                     -H "Authorization: token ${{ secrets.INFRA_REPO_PAT }}" \
                     -H "Accept: application/vnd.github.v3+json" \
-                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/dispatches \
-                    -d "{\"event_type\":\"preview\",\"client_payload\":{\"tag\":\"${TAG}\",\"pr_number\":\"${{ steps.pr.outputs.number }}\"}}"
+                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/actions/workflows/digger.yml/dispatches \
+                    -d "{\"ref\":\"main\",\"inputs\":{\"environment\":\"${ENV}\",\"image_tag\":\"${TAG}\",\"action\":\"apply\"}}"
 
     cleanup:
         if: github.event_name == 'pull_request' && github.event.action == 'closed'
         runs-on: ubuntu-latest
-
         steps:
             - name: Trigger Preview Cleanup
               run: |
                   curl -X POST \
                     -H "Authorization: token ${{ secrets.INFRA_REPO_PAT }}" \
                     -H "Accept: application/vnd.github.v3+json" \
-                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/dispatches \
-                    -d '{"event_type":"cleanup","client_payload":{"pr_number":"${{ github.event.pull_request.number }}"}}'
+                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/actions/workflows/digger.yml/dispatches \
+                    -d "{\"ref\":\"main\",\"inputs\":{\"environment\":\"pr-${{ github.event.pull_request.number }}\",\"image_tag\":\"dummy\",\"action\":\"destroy\"}}"
