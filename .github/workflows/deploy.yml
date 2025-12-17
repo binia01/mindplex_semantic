@@ -1,0 +1,108 @@
+name: Build and Deploy
+
+on:
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
+        types: [opened, synchronize, reopened, closed]
+    issue_comment:
+        types: [created]
+
+jobs:
+    build:
+        if: |
+            (github.event_name == 'push') ||
+            (github.event_name == 'pull_request' && github.event.action != 'closed')
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: main
+
+            - name: Determine Tag & Environment
+              id: vars
+              run: |
+                  if [ "${{ github.event_name }}" == "pull_request" ]; then
+                    TAG="pr-${{ github.event.pull_request.number }}-${GITHUB_SHA:0:7}"
+                    ENV="pr-${{ github.event.pull_request.number }}"
+                  elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+                    TAG="${GITHUB_SHA:0:7}"
+                    ENV="prod"
+                  else
+                    TAG="dev-${GITHUB_SHA:0:7}"
+                    ENV="dev"
+                  fi
+                  echo "tag=${TAG}" >> $GITHUB_OUTPUT
+                  echo "environment=${ENV}" >> $GITHUB_OUTPUT
+
+            - name: Configure AWS
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-east-1
+
+            - name: Login to ECR
+              run: |
+                  aws ecr get-login-password --region us-east-1 | \
+                    docker login --username AWS --password-stdin 521520215337.dkr.ecr.us-east-1.amazonaws.com
+
+            - name: Build and Push
+              run: |
+                  docker build -t 521520215337.dkr.ecr.us-east-1.amazonaws.com/mindplex-semantic:${{ steps.vars.outputs.tag }} .
+                  docker push 521520215337.dkr.ecr.us-east-1.amazonaws.com/mindplex-semantic:${{ steps.vars.outputs.tag }}
+                  echo "Image pushed: ${{ steps.vars.outputs.tag }}"
+
+            - name: Trigger Deploy (only on push to main/develop)
+              if: github.event_name == 'push'
+              run: |
+                  curl -X POST \
+                    -H "Authorization: token ${{ secrets.INFRA_REPO_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/actions/workflows/digger.yml/dispatches \
+                    -d "{\"ref\":\"main\",\"inputs\":{\"environment\":\"${{ steps.vars.outputs.environment }}\",\"image_tag\":\"${{ steps.vars.outputs.tag }}\",\"action\":\"apply\"}}"
+
+    preview:
+        if: |
+            github.event_name == 'issue_comment' &&
+            github.event.issue.pull_request &&
+            contains(github.event.comment.body, 'preview')
+        runs-on: ubuntu-latest
+        steps:
+            - name: Get PR details
+              id: pr
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const pr = await github.rest.pulls.get({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: context.issue.number
+                      });
+                      core.setOutput('sha', pr.data.head.sha);
+                      core.setOutput('number', context.issue.number);
+
+            - name: Trigger Preview Deployment
+              run: |
+                  TAG="pr-${{ steps.pr.outputs.number }}-$(echo ${{ steps.pr.outputs.sha }} | cut -c1-7)"
+                  ENV="pr-${{ steps.pr.outputs.number }}"
+
+                  curl -X POST \
+                    -H "Authorization: token ${{ secrets.INFRA_REPO_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/actions/workflows/digger.yml/dispatches \
+                    -d "{\"ref\":\"main\",\"inputs\":{\"environment\":\"${ENV}\",\"image_tag\":\"${TAG}\",\"action\":\"apply\"}}"
+
+    cleanup:
+        if: github.event_name == 'pull_request' && github.event.action == 'closed'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Trigger Preview Cleanup
+              run: |
+                  curl -X POST \
+                    -H "Authorization: token ${{ secrets.INFRA_REPO_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    https://api.github.com/repos/Xcceleran-do/mindplex_infra/actions/workflows/digger.yml/dispatches \
+                    -d "{\"ref\":\"main\",\"inputs\":{\"environment\":\"pr-${{ github.event.pull_request.number }}\",\"image_tag\":\"dummy\",\"action\":\"destroy\"}}"
