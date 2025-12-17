@@ -27,7 +27,7 @@ app.route('/search', search)
 app.route('/users', usersRoute)
 
 app.get('/', (c) => {
-  return c.text('Hello Mindplex search!')
+  return c.text('Hello Preview search!')
 })
 
 app.get('/health', async (c) => {
