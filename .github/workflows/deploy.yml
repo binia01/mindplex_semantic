@@ -24,11 +24,20 @@ jobs:
               id: login-ecr
               uses: aws-actions/amazon-ecr-login@v1
 
-            - name: Build, Tag, and Push
+            - name: Set Image Tag
+              id: tag
+              run: |
+                  if [ "${{ github.event_name }}" == "pull_request" ]; then
+                      echo "IMAGE_TAG=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+                  else
+                      echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Build and Push
               env:
                   ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
                   ECR_REPOSITORY: mindplex-semantic
-                  IMAGE_TAG: ${{ github.sha }}
+                  IMAGE_TAG: ${{ steps.tag.outputs.IMAGE_TAG }}
               run: |
                   docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
                   docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
