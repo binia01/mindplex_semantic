@@ -1,0 +1,12 @@
+version: 1
+
+dirs:
+  "terraform/dev":
+    tags: ["dev"]
+
+hooks:
+  all:
+    pre:
+      - type: env
+        name: TF_VAR_image_tag
+        cmd: ["echo", "${TERRATEAM_GIT_SHA}"]
