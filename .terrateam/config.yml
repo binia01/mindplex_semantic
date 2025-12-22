@@ -3,6 +3,16 @@ version: "1"
 dirs:
   "terraform/dev":
     tags: ["dev"]
+    when_modified:
+      file_patterns: ["**/*"]
+      autoplan: true
+      autoapply: true
+
+apply_requirements:
+  checks:
+    - tag_query: "" 
+      status_checks:
+        enabled: true
 
 hooks:
   all:
