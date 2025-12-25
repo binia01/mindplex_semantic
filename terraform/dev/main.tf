@@ -41,13 +41,11 @@ module "mindplex_semantic" {
 
   enable_alb       = true
   alb_listener_arn = data.terraform_remote_state.foundation.outputs.https_listener_arn
+  host_header      = "dev-search.mindplex.ai"
+  path_pattern     = "/*"
+  rule_priority    = 10
 
-  host_header   = "dev-search.mindplex.ai"
-  path_pattern  = "/*"
-  rule_priority = 10
-
-  image_url = "${data.terraform_remote_state.foundation.outputs.ecr_repository_url_semantic}:${var.image_tag}"
-
+  image_url      = "${data.terraform_remote_state.foundation.outputs.ecr_repository_url_semantic}:${var.image_tag}"
   container_port = 3000
 
   environment_vars = [
@@ -61,7 +59,7 @@ module "mindplex_semantic" {
     },
     {
       name  = "DB_PASS"
-      value = var.db_password
+      value = var.TF_VAR_DB_PASSWORD
     },
     {
       name  = "DB_NAME"
@@ -69,7 +67,7 @@ module "mindplex_semantic" {
     },
     {
       name  = "DATABASE_URL"
-      value = "postgresql://mindplex_admin:${var.db_password}@${data.terraform_remote_state.foundation.outputs.db_endpoint}:5432/mindplex_shared"
+      value = "postgresql://mindplex_admin:${var.TF_VAR_DB_PASSWORD}@${data.terraform_remote_state.foundation.outputs.db_endpoint}:5432/mindplex_shared"
     }
   ]
 }
