@@ -12,6 +12,7 @@ async function bootstrap() {
     const targetDbName = urlObj.pathname.split('/')[1];
 
     urlObj.pathname = '/mindplex_shared';
+    urlObj.searchParams.delete('ssl')
     const maintenanceUrl = urlObj.toString();
 
     console.log(`Connecting to administrative DB to check for "${targetDbName}"...`);
