@@ -14,7 +14,11 @@ export default defineConfig({
   schema: './src/db/schema.ts',
   dialect: 'postgresql',
   dbCredentials: {
-    url: databaseUrl,
+    host: urlObj.hostname,
+    port: Number(urlObj.port),
+    user: urlObj.username,
+    password: urlObj.password,
+    database: urlObj.pathname.slice(1),
     ssl: {
       rejectUnauthorized: false
     },
