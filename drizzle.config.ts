@@ -2,8 +2,12 @@ import { defineConfig } from 'drizzle-kit';
 
 const databaseUrl = process.env.DATABASE_URL!;
 const urlObj = new URL(databaseUrl);
+
 urlObj.searchParams.delete('ssl');
 urlObj.searchParams.delete('sslmode');
+
+const sanitizedLog = urlObj.toString().replace(/:([^:@]+)@/, ':****@');
+console.log(`[Drizzle Config] Using sanitized URL: ${sanitizedLog}`);
 
 export default defineConfig({
   out: './drizzle',
