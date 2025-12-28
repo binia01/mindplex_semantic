@@ -11,9 +11,9 @@ async function bootstrap() {
     const urlObj = new URL(targetUrl);
     const targetDbName = urlObj.pathname.split('/')[1];
 
-
     urlObj.pathname = '/mindplex_shared';
     urlObj.searchParams.delete('ssl');
+    urlObj.searchParams.delete('sslmode');
     const maintenanceUrl = urlObj.toString();
 
     console.log(`Connecting to administrative DB to check for "${targetDbName}"...`);
@@ -46,10 +46,16 @@ async function bootstrap() {
         await maintenanceClient.end();
     }
 
+
     console.log(`Installing required extensions in "${targetDbName}"...`);
 
+
+    const targetUrlObj = new URL(targetUrl);
+    targetUrlObj.searchParams.delete('ssl');
+    targetUrlObj.searchParams.delete('sslmode');
+
     const targetClient = new Client({
-        connectionString: targetUrl,
+        connectionString: targetUrlObj.toString(),
         ssl: { rejectUnauthorized: false }
     });
 
@@ -57,10 +63,13 @@ async function bootstrap() {
         await targetClient.connect();
 
         await targetClient.query('CREATE EXTENSION IF NOT EXISTS vector;');
+        console.log('✓ vector extension installed');
 
         await targetClient.query('CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;');
+        console.log('✓ fuzzystrmatch extension installed');
 
         await targetClient.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+        console.log('✓ pg_trgm extension installed');
 
         console.log(`Bootstrap completed successfully!`);
 
