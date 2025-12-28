@@ -12,8 +12,7 @@ async function bootstrap() {
     const targetDbName = urlObj.pathname.split('/')[1];
 
     urlObj.pathname = '/mindplex_shared';
-    urlObj.searchParams.delete('ssl');
-    urlObj.searchParams.delete('sslmode');
+
     const maintenanceUrl = urlObj.toString();
 
     console.log(`Connecting to administrative DB to check for "${targetDbName}"...`);
@@ -49,10 +48,7 @@ async function bootstrap() {
 
     console.log(`Installing required extensions in "${targetDbName}"...`);
 
-
     const targetUrlObj = new URL(targetUrl);
-    targetUrlObj.searchParams.delete('ssl');
-    targetUrlObj.searchParams.delete('sslmode');
 
     const targetClient = new Client({
         connectionString: targetUrlObj.toString(),
