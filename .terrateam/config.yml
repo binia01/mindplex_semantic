@@ -1,12 +1,16 @@
 version: "1"
 
+automerge:
+  enabled: true
+  require_explicit_apply: true
+
 dirs:
   "terraform/dev":
     tags: ["dev"]
     when_modified:
       file_patterns: ["**/*"]
       autoplan: true
-      autoapply: true
+      autoapply: false
 
 apply_requirements:
   checks:
@@ -20,3 +24,8 @@ hooks:
       - type: env
         name: TF_VAR_image_tag
         cmd: ["sh", "-c", "echo $GITHUB_SHA"]
+    post:
+      - type: run
+        run_on: failure
+        cmd: ["$TERRATEAM_ROOT/terraform/scripts/fetch_logs.sh", "mindplex-dev-cluster", "mindplex-semantic-dev", "/ecs/mindplex-semantic-dev"]
+        
