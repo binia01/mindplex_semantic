@@ -1,18 +1,16 @@
-// src/openapi.ts
-
 export const openApiDoc = {
     openapi: '3.0.0',
     info: {
-        title: 'Hono Article & User API',
+        title: 'Mindplex Semantic API',
         version: '1.0.0',
-        description: 'API for ingesting articles, managing users, and performing semantic search.',
+        description: 'API for managing articles and users with semantic search and ingestion capabilities for mindplex applications.',
     },
     components: {
         schemas: {
             PostData: {
                 type: 'object',
                 properties: {
-                    ID: { type: 'number' },
+                    id: { type: 'number' },
                     post_date: { type: 'string', format: 'date-time' },
                     post_content: { type: 'string' },
                     brief_overview: { type: 'string' },
@@ -28,7 +26,7 @@ export const openApiDoc = {
                         properties: { name: { type: 'string' } }
                     }
                 },
-                required: ['ID', 'post_title']
+                required: ['id', 'post_title']
             },
             UserData: {
                 type: 'object',
