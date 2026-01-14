@@ -9,17 +9,21 @@ const ObjectOrEmptyArray = v.union([
 
 export const IngestArticleSchema = v.object({
     post: v.object({
-        id: v.number(),
+        id: v.union([
+            v.number(),
+            v.pipe(v.string(), v.transform(Number))
+        ]),
         post_title: v.string(),
         post_name: v.string(),
         post_content: v.string(),
         brief_overview: v.string(),
         author_name: v.string(),
 
-        post_date: v.pipe(v.string(), v.isoTimestamp()),
+        post_date: v.pipe(v.string(), v.transform((dateString) => new Date(dateString))),
 
         tag: v.optional(ObjectOrEmptyArray, []),
         category: v.optional(ObjectOrEmptyArray, []),
+
 
         other_authors: v.optional(v.tuple([]), []),
         co_authors: v.optional(v.tuple([]), []),
