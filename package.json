@@ -13,6 +13,7 @@
     "@hono/swagger-ui": "^0.5.3",
     "@hono/valibot-validator": "^0.6.1",
     "@types/pg": "^8.15.6",
+    "destr": "^2.0.5",
     "drizzle-kit": "^0.31.7",
     "drizzle-orm": "^0.44.7",
     "hono": "^4.10.7",
