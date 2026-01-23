@@ -74,6 +74,14 @@ module "mindplex_semantic" {
     {
       name  = "DATABASE_URL"
       value = "postgresql://mindplex_admin:${var.DB_PASSWORD}@${data.terraform_remote_state.foundation.outputs.db_endpoint}:5432/mindplex_semantic"
+    },
+    {
+      name  = "REDIS_URL"
+      value = "rediss://${data.terraform_remote_state.foundation.outputs.redis_endpoint}:6379"
+    },
+    {
+      name  = "REDIS_TLS"
+      value = "true"
     }
   ]
 }

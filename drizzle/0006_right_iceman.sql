@@ -1,0 +1,2 @@
+ALTER TABLE "article_chunks" drop column "search_vector";--> statement-breakpoint
+ALTER TABLE "article_chunks" ADD COLUMN "search_vector" "tsvector" GENERATED ALWAYS AS (to_tsvector('english', chunk_to_embed)) STORED;

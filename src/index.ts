@@ -38,10 +38,10 @@ app.use(dbMiddleware)
 app.get('/doc', (c) => c.json(openApiDoc))
 app.get('/ui', swaggerUI({ url: '/doc' }))
 
-app.route('/ingest', ingest)
-app.route('/articles', articles)
-app.route('/search', search)
-app.route('/users', usersRoute)
+app.route('/v1/ingest', ingest)
+app.route('/v1/articles', articles)
+app.route('/v1/search', search)
+app.route('/v1/users', usersRoute)
 
 app.get('/', (c) => {
   return c.json({ message: 'This service is not meant to be accessed directly. Use the API endpoints instead.' })

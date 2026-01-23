@@ -15,6 +15,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build: .
     ports:
@@ -24,6 +37,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     develop:
       watch:
         - action: sync
@@ -31,3 +46,4 @@ services:
           target: /app/src
 volumes:
   pgdata:
+  redisdata:

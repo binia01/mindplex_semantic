@@ -1,6 +1,10 @@
 import { pgTable, serial, text, integer, timestamp, index, unique } from 'drizzle-orm/pg-core'
-import { vector } from 'drizzle-orm/pg-core'
+import { vector, customType } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+
+const tsvector = customType<{ data: string }>({
+    dataType: () => 'tsvector',
+});
 
 export const articles = pgTable('articles', {
     id: serial('id').primaryKey(),
@@ -10,11 +14,19 @@ export const articles = pgTable('articles', {
     title: text('title').notNull(),
     category: text('category').array(),
     tags: text('tags').array(),
+    content: text('content').notNull().default(''),
     publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
+
+    embedding: vector('embedding', { dimensions: 1024 }),
+    searchVector: tsvector('search_vector').generatedAlwaysAs(
+        sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || 
+            setweight(to_tsvector('english', coalesce(teaser, '')), 'B')`
+    ),
+
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-    embedding: vector('embedding', { dimensions: 1024 })
 }, (table) => [
-    index('articles_embedding_idx').using('hnsw', table.embedding.op('vector_cosine_ops'))
+    index('articles_embedding_idx').using('hnsw', table.embedding.op('vector_cosine_ops')),
+    index('articles_search_idx').using('gin', table.searchVector)
 ])
 
 export const articleAuthors = pgTable('article_authors', {
@@ -30,12 +42,19 @@ export const articleChunks = pgTable('article_chunks', {
     articleId: integer('article_id').references(() => articles.id, { onDelete: 'cascade' }).notNull(),
     chunkIndex: integer('chunk_index').notNull(),
     rawContent: text('raw_content').notNull(),
-    embeddedContent: text('embedded_content').notNull(),
+    chunkToEmbed: text('chunk_to_embed').notNull(),
+
     embedding: vector('embedding', { dimensions: 1024 }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+
+    searchVector: tsvector('search_vector').generatedAlwaysAs(
+        sql`to_tsvector('english', chunk_to_embed)`
+    ),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
     index('article_chunks_article_id_idx').on(table.articleId),
-    index('article_chunks_embedding_idx').using('hnsw', table.embedding.op('vector_cosine_ops'))
+    index('article_chunks_embedding_idx').using('hnsw', table.embedding.op('vector_cosine_ops')),
+    index('chunks_search_idx').using('gin', table.searchVector)
 ])
 
 export const users = pgTable('users', {
@@ -52,3 +71,5 @@ export const users = pgTable('users', {
 }, (table) => [
     index('users_search_name_trgm_idx').using('gin', sql`${table.searchName} gin_trgm_ops`)
 ])
+
+export const Articles = articles.$inferSelect;

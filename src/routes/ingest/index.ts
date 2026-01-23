@@ -49,6 +49,7 @@ ingest.post('/articles', vValidator('json', IngestArticleSchema), async (c) => {
                 tags: tags.split(','),
                 category: category.split(','),
                 teaser: pageContents.brief_overview,
+                content: pageContents.post_content,
                 publishedAt: new Date(pageContents.post_date),
                 externalId: pageContents.id,
                 embedding: titleEmbedding,
@@ -62,7 +63,7 @@ ingest.post('/articles', vValidator('json', IngestArticleSchema), async (c) => {
                     articleId,
                     chunkIndex: c.index,
                     rawContent: c.content,
-                    embeddedContent: `Title: ${c.title}\nAuthor: ${c.author}\nCategory: ${c.category}\nDate: ${c.date}\n\n${c.content}`,
+                    chunkToEmbed: `Title: ${c.title}\nAuthor: ${c.author}\nCategory: ${c.category}\nDate: ${c.date}\n\n${c.content}`,
                     embedding: chunkEmbeddings.get(c.index)
                 }))
             )
