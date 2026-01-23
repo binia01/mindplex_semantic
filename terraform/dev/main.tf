@@ -32,13 +32,13 @@ variable "DB_PASSWORD" {
   sensitive   = true
 }
 
-variable "bedrock_access_key" {
+variable "BEDROCK_ACCESS_KEY" {
   description = "Bedrock Access Key (Must be set in GitHub Secrets as TF_VAR_bedrock_access_key)"
   type        = string
   sensitive   = true
 }
 
-variable "bedrock_secret_key" {
+variable "BEDROCK_SECRET_KEY" {
   description = "Bedrock Secret Key (Must be set in GitHub Secrets as TF_VAR_bedrock_secret_key)"
   type        = string
   sensitive   = true
@@ -89,11 +89,11 @@ module "mindplex_semantic" {
     },
     {
       name  = "AWS_BEDROCK_ACCESS_KEY"
-      value = var.bedrock_access_key
+      value = var.BEDROCK_ACCESS_KEY
     },
     {
       name  = "AWS_BEDROCK_SECRET_KEY"
-      value = var.bedrock_secret_key
+      value = var.BEDROCK_SECRET_KEY
     },
     {
       name  = "AWS_REGION"
