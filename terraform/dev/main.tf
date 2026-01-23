@@ -88,11 +88,11 @@ module "mindplex_semantic" {
       value = "postgresql://mindplex_admin:${var.DB_PASSWORD}@${data.terraform_remote_state.foundation.outputs.db_endpoint}:5432/mindplex_semantic"
     },
     {
-      name  = "AWS_ACCESS_KEY_ID"
+      name  = "AWS_BEDROCK_ACCESS_KEY"
       value = var.bedrock_access_key
     },
     {
-      name  = "AWS_SECRET_ACCESS_KEY"
+      name  = "AWS_BEDROCK_SECRET_KEY"
       value = var.bedrock_secret_key
     },
     {
