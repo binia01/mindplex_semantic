@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { sql } from 'drizzle-orm'
-import { SearchQuerySchema } from './schema'
+import { eq, sql } from 'drizzle-orm'
+import { ALLOWED_USER_UPDATE_FIELDS, ExternalIdParamsSchema, FORBIDDEN_USER_COLUMNS, GetUserQuerySchema, SearchQuerySchema, UpdateUserSchema } from './schema'
 import { AppContext } from '$src/types'
 import { vValidator } from '@hono/valibot-validator';
+import { buildFieldSelection, sanitizeUpdates } from '$src/utils';
 
 const users = new Hono<AppContext>()
 
@@ -17,37 +18,124 @@ export const getSearchScoreSql = (query: string) => sql`
   )
 `;
 
-users.get('/', vValidator('query', SearchQuerySchema), async (c) => {
+users.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     const { limit, offset, q: searchQuery } = c.req.valid('query');
 
     const db = c.get('db')
-    const schema = c.get('schema')
+    const { users } = c.get('schema')
+    const { fields } = c.req.valid('query')
 
     if (!searchQuery) {
         return c.json({ users: [] })
     }
 
+    const selection = buildFieldSelection(
+        users,
+        fields,
+        FORBIDDEN_USER_COLUMNS,
+        {
+            id: users.id,
+            score: getSearchScoreSql(searchQuery).as('relevance_score')
+        }
+    )
+
     const threshold = searchQuery.length < 5 ? 0.39 : 0.3;
 
-    const users = await db.select({
-        id: schema.users.id,
-        firstName: schema.users.firstName,
-        username: schema.users.username,
-        email: schema.users.email,
-        score: getSearchScoreSql(searchQuery).as('relevance_score')
-    })
-        .from(schema.users)
+    const result = await db.select(selection)
+        .from(users)
         .where(sql`
-        (${schema.users.firstName} ILIKE ${searchQuery} || '%') 
-        OR (${schema.users.username} ILIKE ${searchQuery} || '%') 
-        OR (${schema.users.email} ILIKE ${searchQuery} || '%')
-        OR (word_similarity(${searchQuery}, ${schema.users.searchName}) > ${threshold})
+        (${users.firstName} ILIKE ${searchQuery} || '%') 
+        OR (${users.username} ILIKE ${searchQuery} || '%') 
+        OR (${users.email} ILIKE ${searchQuery} || '%')
+        OR (word_similarity(${searchQuery}, ${users.searchName}) > ${threshold})
     `)
         .orderBy(sql`relevance_score DESC`)
         .limit(limit)
         .offset(offset);
 
-    return c.json({ users, query: searchQuery, limit, offset, total: users.length })
+    return c.json({
+        users: result,
+        meta: {
+            query: searchQuery,
+            count: result.length,
+            limit,
+            offset
+        }
+    })
+})
+
+users.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetUserQuerySchema), async (c) => {
+    const { id: externalId } = c.req.valid('param')
+
+    const db = c.get('db')
+    const { users } = c.get('schema')
+
+    const { fields } = c.req.valid('query')
+
+    const selection = buildFieldSelection(
+        users,
+        fields,
+        FORBIDDEN_USER_COLUMNS,
+        { id: users.id }
+    )
+
+    const [result] = await db.select(selection)
+        .from(users)
+        .where(eq(users.externalId, externalId))
+
+    if (!result) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    return c.json(result)
+})
+
+users.patch('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('json', UpdateUserSchema), async (c) => {
+    const { id: externalId } = c.req.valid('param')
+    const updates = c.req.valid('json')
+
+    const db = c.get('db')
+    const { users } = c.get('schema')
+
+    const [existing] = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.externalId, externalId))
+
+    if (!existing) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    const sanitizedUpdates = sanitizeUpdates(updates, ALLOWED_USER_UPDATE_FIELDS)
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+        return c.json({ error: 'No valid fields to update' }, 400)
+    }
+
+    const [updated] = await db.update(users)
+        .set(sanitizedUpdates)
+        .where(eq(users.externalId, externalId))
+        .returning()
+
+    return c.json({ message: 'User updated successfully', user: updated })
+})
+
+users.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) => {
+    const { id: externalId } = c.req.valid('param')
+    const db = c.get('db')
+    const { users } = c.get('schema')
+
+    const [existing] = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.externalId, externalId))
+
+    if (!existing) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    await db.delete(users)
+        .where(eq(users.externalId, externalId))
+
+    return c.json({ message: 'User deleted successfully', externalId })
 })
 
 export default users

@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { createMiddleware } from "hono/factory";
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from "pg";
-import { swaggerUI } from '@hono/swagger-ui'
+import { Scalar } from '@scalar/hono-api-reference'
+
 
 import articles from '$src/routes/articles'
 import search from '$src/routes/search'
@@ -36,7 +37,7 @@ const dbMiddleware = createMiddleware(async (c, next) => {
 app.use(dbMiddleware)
 
 app.get('/doc', (c) => c.json(openApiDoc))
-app.get('/ui', swaggerUI({ url: '/doc' }))
+app.get('/ui', Scalar({ url: '/doc' }))
 
 app.route('/v1/ingest', ingest)
 app.route('/v1/articles', articles)
