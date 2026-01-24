@@ -23,7 +23,8 @@ export const getHybridScoreSql = (
     return sql`(${vectorScore} * 0.7) + (${normalizedTextScore} * 0.3)`
 }
 
-articles.get('/', vValidator('query', SearchQuerySchema), async (c) => {
+
+articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     const db = c.get('db')
     const { articles, articleChunks } = c.get('schema')
     const query = c.req.valid('query')
@@ -82,19 +83,22 @@ articles.get('/', vValidator('query', SearchQuerySchema), async (c) => {
         { id: articles.id, score: distinctMatches.finalScore }
     )
 
-    const results = await db.select({
-        id: articles.id,
-        selection
-    })
+    const results = await db.select(selection)
         .from(distinctMatches)
         .innerJoin(articles, eq(articles.id, distinctMatches.id))
         .orderBy(desc(distinctMatches.finalScore))
 
     return c.json({
         articles: results,
-        meta: { query: searchQuery, count: results.length }
+        meta: {
+            query: searchQuery,
+            count: results.length,
+            limit,
+            offset
+        }
     })
 })
+
 
 articles.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetArticleQuerySchema), async (c) => {
     const { id: externalId } = c.req.valid('param')
@@ -111,7 +115,7 @@ articles.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('qu
         { id: articles.id }
     )
 
-    const [result] = await db.select({ ...selection })
+    const [result] = await db.select(selection)
         .from(articles)
         .leftJoin(articleAuthors, eq(articles.id, articleAuthors.articleId))
         .leftJoin(users, eq(articleAuthors.userId, users.id))
@@ -121,7 +125,7 @@ articles.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('qu
         return c.json({ error: 'Article not found' }, 404)
     }
 
-    return c.json({ ...result })
+    return c.json(result)
 })
 
 articles.patch('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('json', UpdateArticleSchema), async (c) => {
@@ -149,10 +153,7 @@ articles.patch('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('
         .where(eq(articles.externalId, externalId))
         .returning()
 
-    return c.json({
-        message: 'Article updated successfully',
-        article: updated
-    })
+    return c.json({ message: 'Article updated successfully', article: updated })
 })
 
 articles.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) => {
@@ -172,10 +173,8 @@ articles.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) =
     await db.delete(articles)
         .where(eq(articles.externalId, externalId))
 
-    return c.json({
-        message: 'Article deleted successfully',
-        externalId
-    }, 200)
+    return c.json({ message: 'Article deleted successfully', externalId })
 })
+
 
 export default articles

@@ -22,33 +22,46 @@ users.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     const { limit, offset, q: searchQuery } = c.req.valid('query');
 
     const db = c.get('db')
-    const schema = c.get('schema')
+    const { users } = c.get('schema')
+    const { fields } = c.req.valid('query')
 
     if (!searchQuery) {
         return c.json({ users: [] })
     }
 
+    const selection = buildFieldSelection(
+        users,
+        fields,
+        FORBIDDEN_USER_COLUMNS,
+        {
+            id: users.id,
+            score: getSearchScoreSql(searchQuery).as('relevance_score')
+        }
+    )
+
     const threshold = searchQuery.length < 5 ? 0.39 : 0.3;
 
-    const users = await db.select({
-        id: schema.users.id,
-        firstName: schema.users.firstName,
-        username: schema.users.username,
-        email: schema.users.email,
-        score: getSearchScoreSql(searchQuery).as('relevance_score')
-    })
-        .from(schema.users)
+    const result = await db.select(selection)
+        .from(users)
         .where(sql`
-        (${schema.users.firstName} ILIKE ${searchQuery} || '%') 
-        OR (${schema.users.username} ILIKE ${searchQuery} || '%') 
-        OR (${schema.users.email} ILIKE ${searchQuery} || '%')
-        OR (word_similarity(${searchQuery}, ${schema.users.searchName}) > ${threshold})
+        (${users.firstName} ILIKE ${searchQuery} || '%') 
+        OR (${users.username} ILIKE ${searchQuery} || '%') 
+        OR (${users.email} ILIKE ${searchQuery} || '%')
+        OR (word_similarity(${searchQuery}, ${users.searchName}) > ${threshold})
     `)
         .orderBy(sql`relevance_score DESC`)
         .limit(limit)
         .offset(offset);
 
-    return c.json({ users, query: searchQuery, limit, offset, total: users.length })
+    return c.json({
+        users: result,
+        meta: {
+            query: searchQuery,
+            count: result.length,
+            limit,
+            offset
+        }
+    })
 })
 
 users.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetUserQuerySchema), async (c) => {
@@ -57,7 +70,7 @@ users.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query
     const db = c.get('db')
     const { users } = c.get('schema')
 
-    const fields = c.req.valid('query').fields
+    const { fields } = c.req.valid('query')
 
     const selection = buildFieldSelection(
         users,
@@ -74,7 +87,7 @@ users.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query
         return c.json({ error: 'User not found' }, 404)
     }
 
-    return c.json({ ...result })
+    return c.json(result)
 })
 
 users.patch('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('json', UpdateUserSchema), async (c) => {
@@ -103,10 +116,7 @@ users.patch('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('jso
         .where(eq(users.externalId, externalId))
         .returning()
 
-    return c.json({
-        message: 'User updated successfully',
-        user: updated
-    })
+    return c.json({ message: 'User updated successfully', user: updated })
 })
 
 users.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) => {
@@ -125,10 +135,7 @@ users.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) => {
     await db.delete(users)
         .where(eq(users.externalId, externalId))
 
-    return c.json({
-        message: 'User deleted successfully',
-        externalId
-    }, 200)
+    return c.json({ message: 'User deleted successfully', externalId })
 })
 
 export default users

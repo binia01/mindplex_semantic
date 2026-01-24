@@ -12,7 +12,7 @@ export const openApiDoc = {
         version: '1.0.0',
         contact: {
             name: 'API Support',
-            email: 'support@example.com'
+            email: 'support@mindplex.ai'
         }
     },
     servers: [
@@ -21,7 +21,11 @@ export const openApiDoc = {
             description: 'Development server'
         },
         {
-            url: 'https://api.example.com/v1',
+            url: 'https://dev-search.mindplex.ai/v1',
+            description: 'Development server'
+        },
+        {
+            url: 'https://search.mindplex.ai/v1',
             description: 'Production server'
         }
     ],
@@ -40,7 +44,7 @@ export const openApiDoc = {
         }
     ],
     paths: {
-        '/articles': {
+        '/articles/search': {
             get: {
                 tags: ['Articles'],
                 summary: 'Search articles',
@@ -109,7 +113,9 @@ Returns articles ranked by relevance score (70% vector, 30% text).
                                             type: 'object',
                                             properties: {
                                                 query: { type: 'string' },
-                                                count: { type: 'integer' }
+                                                count: { type: 'integer' },
+                                                limit: { type: 'integer' },
+                                                offset: { type: 'integer' }
                                             }
                                         }
                                     }
@@ -254,7 +260,7 @@ Returns articles ranked by relevance score (70% vector, 30% text).
                 }
             }
         },
-        '/users': {
+        '/users/search': {
             get: {
                 tags: ['Users'],
                 summary: 'Search users',
@@ -323,7 +329,9 @@ Searches across first name, last name, username, and email.
                                             type: 'object',
                                             properties: {
                                                 query: { type: 'string' },
-                                                count: { type: 'integer' }
+                                                count: { type: 'integer' },
+                                                limit: { type: 'integer' },
+                                                offset: { type: 'integer' }
                                             }
                                         }
                                     }
@@ -499,7 +507,8 @@ This is a heavy operation and may take several seconds.`,
                                     type: 'object',
                                     properties: {
                                         success: { type: 'boolean' },
-                                        chunksCreated: { type: 'integer' }
+                                        chunksCreated: { type: 'integer' },
+
                                     }
                                 }
                             }
