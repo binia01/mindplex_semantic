@@ -20,9 +20,10 @@ export const articles = pgTable('articles', {
     embedding: vector('embedding', { dimensions: 1024 }),
     searchVector: tsvector('search_vector').generatedAlwaysAs(
         sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || 
-            setweight(to_tsvector('english', coalesce(teaser, '')), 'B')`
+        setweight(to_tsvector('english', coalesce(teaser, '')), 'B')`
     ),
 
+    updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
     index('articles_embedding_idx').using('hnsw', table.embedding.op('vector_cosine_ops')),
@@ -50,6 +51,7 @@ export const articleChunks = pgTable('article_chunks', {
         sql`to_tsvector('english', chunk_to_embed)`
     ),
 
+    updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
     index('article_chunks_article_id_idx').on(table.articleId),
@@ -67,6 +69,7 @@ export const users = pgTable('users', {
         sql`lower(first_name || ' ' || last_name || ' ' || username || ' ' || COALESCE(email, ''))`
     ),
     email: text('email'),
+    updatedAt: timestamp('updated_at').defaultNow().notNull().$onUpdate(() => new Date()),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 }, (table) => [
     index('users_search_name_trgm_idx').using('gin', sql`${table.searchName} gin_trgm_ops`)

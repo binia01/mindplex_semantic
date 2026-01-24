@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { sql } from 'drizzle-orm'
-import { SearchQuerySchema } from './schema'
+import { eq, sql } from 'drizzle-orm'
+import { ALLOWED_USER_UPDATE_FIELDS, ExternalIdParamsSchema, FORBIDDEN_USER_COLUMNS, GetUserQuerySchema, SearchQuerySchema, UpdateUserSchema } from './schema'
 import { AppContext } from '$src/types'
 import { vValidator } from '@hono/valibot-validator';
+import { buildFieldSelection, sanitizeUpdates } from '$src/utils';
 
 const users = new Hono<AppContext>()
 
@@ -17,7 +18,7 @@ export const getSearchScoreSql = (query: string) => sql`
   )
 `;
 
-users.get('/', vValidator('query', SearchQuerySchema), async (c) => {
+users.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     const { limit, offset, q: searchQuery } = c.req.valid('query');
 
     const db = c.get('db')
@@ -48,6 +49,86 @@ users.get('/', vValidator('query', SearchQuerySchema), async (c) => {
         .offset(offset);
 
     return c.json({ users, query: searchQuery, limit, offset, total: users.length })
+})
+
+users.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetUserQuerySchema), async (c) => {
+    const { id: externalId } = c.req.valid('param')
+
+    const db = c.get('db')
+    const { users } = c.get('schema')
+
+    const fields = c.req.valid('query').fields
+
+    const selection = buildFieldSelection(
+        users,
+        fields,
+        FORBIDDEN_USER_COLUMNS,
+        { id: users.id }
+    )
+
+    const [result] = await db.select(selection)
+        .from(users)
+        .where(eq(users.externalId, externalId))
+
+    if (!result) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    return c.json({ ...result })
+})
+
+users.patch('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('json', UpdateUserSchema), async (c) => {
+    const { id: externalId } = c.req.valid('param')
+    const updates = c.req.valid('json')
+
+    const db = c.get('db')
+    const { users } = c.get('schema')
+
+    const [existing] = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.externalId, externalId))
+
+    if (!existing) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    const sanitizedUpdates = sanitizeUpdates(updates, ALLOWED_USER_UPDATE_FIELDS)
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+        return c.json({ error: 'No valid fields to update' }, 400)
+    }
+
+    const [updated] = await db.update(users)
+        .set(sanitizedUpdates)
+        .where(eq(users.externalId, externalId))
+        .returning()
+
+    return c.json({
+        message: 'User updated successfully',
+        user: updated
+    })
+})
+
+users.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) => {
+    const { id: externalId } = c.req.valid('param')
+    const db = c.get('db')
+    const { users } = c.get('schema')
+
+    const [existing] = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.externalId, externalId))
+
+    if (!existing) {
+        return c.json({ error: 'User not found' }, 404)
+    }
+
+    await db.delete(users)
+        .where(eq(users.externalId, externalId))
+
+    return c.json({
+        message: 'User deleted successfully',
+        externalId
+    }, 200)
 })
 
 export default users

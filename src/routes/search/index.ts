@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { AppContext } from '$src/types'
 import { vValidator } from '@hono/valibot-validator'
-import { SearchQuerySchema } from './schema'
+import { FORBIDDEN_COLUMNS, SearchQuerySchema } from './schema'
 import { sql, eq, gt, desc, getTableColumns } from 'drizzle-orm'
 import { Embedding } from '$src/lib/Embedding'
 import { unionAll } from 'drizzle-orm/pg-core'
+import { buildFieldSelection } from '$src/utils'
 
 const search = new Hono<AppContext>()
 
@@ -22,10 +23,9 @@ export const getHybridScoreSql = (
 
 search.get('/', vValidator('query', SearchQuerySchema), async (c) => {
     const db = c.get('db')
-    const schema = c.get('schema')
+    const { articles, articleChunks } = c.get('schema')
     const query = c.req.valid('query')
     const { q: searchQuery, limit, offset, fields } = query
-    const allColumns = getTableColumns(schema.articles)
 
     if (!searchQuery) return c.json({ articles: [] })
 
@@ -33,31 +33,31 @@ search.get('/', vValidator('query', SearchQuerySchema), async (c) => {
     const queryEmbedding = await embeddingService.getEmbeddings(searchQuery)
 
     const articleScore = getHybridScoreSql(
-        schema.articles.embedding,
-        schema.articles.searchVector,
+        articles.embedding,
+        articles.searchVector,
         queryEmbedding,
         searchQuery
     )
 
     const chunkScore = getHybridScoreSql(
-        schema.articleChunks.embedding,
-        schema.articleChunks.searchVector,
+        articleChunks.embedding,
+        articleChunks.searchVector,
         queryEmbedding,
         searchQuery
     )
 
     const articleMatches = db.select({
-        articleId: schema.articles.id,
+        articleId: articles.id,
         score: articleScore.as('score')
     })
-        .from(schema.articles)
+        .from(articles)
         .where(gt(articleScore, 0.25))
 
     const chunkMatches = db.select({
-        articleId: schema.articleChunks.articleId,
+        articleId: articleChunks.articleId,
         score: chunkScore.as('score')
     })
-        .from(schema.articleChunks)
+        .from(articleChunks)
         .where(gt(chunkScore, 0.25))
 
     const allMatches = unionAll(articleMatches, chunkMatches).as('all_matches')
@@ -73,26 +73,19 @@ search.get('/', vValidator('query', SearchQuerySchema), async (c) => {
         .offset(offset)
         .as('distinct_matches')
 
-    const selection: Record<string, any> = {
-        id: schema.articles.id,
-        score: distinctMatches.finalScore
-    }
-
-    if (fields) {
-        fields.split(',').forEach(field => {
-            const fieldName = field.trim()
-            if (fieldName in allColumns) {
-                selection[fieldName] = allColumns[fieldName as keyof typeof allColumns]
-            }
-        })
-    }
+    const selection = buildFieldSelection(
+        articles,
+        fields,
+        FORBIDDEN_COLUMNS,
+        { id: articles.id, score: distinctMatches.finalScore }
+    )
 
     const results = await db.select({
-        id: schema.articles.id,
+        id: articles.id,
         selection
     })
         .from(distinctMatches)
-        .innerJoin(schema.articles, eq(schema.articles.id, distinctMatches.id))
+        .innerJoin(articles, eq(articles.id, distinctMatches.id))
         .orderBy(desc(distinctMatches.finalScore))
 
     return c.json({
