@@ -19,8 +19,9 @@ export const getHybridScoreSql = (
 ) => {
     const vectorScore = sql`1 - (${embeddingColumn} <=> ${JSON.stringify(queryEmbedding)})`
     const textScore = sql`ts_rank_cd(${searchVectorColumn}, websearch_to_tsquery('english', ${textQuery}))`
-    const normalizedTextScore = sql`LEAST(${textScore}, 1.0)`
-    return sql`(${vectorScore} * 0.7) + (${normalizedTextScore} * 0.3)`
+    const normalizedTextScore = sql`(${textScore} / (${textScore} + 0.1))`
+
+    return sql`(${vectorScore} * 0.5) + (${normalizedTextScore} * 0.5)`
 }
 
 
@@ -48,13 +49,14 @@ articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
         queryEmbedding,
         searchQuery
     )
+    const THRESHOLD = 0.45;
 
     const articleMatches = db.select({
         articleId: articles.id,
         score: articleScore.as('score')
     })
         .from(articles)
-        .where(gt(articleScore, 0.25))
+        .where(gt(articleScore, THRESHOLD))
 
     const chunkMatches = db.select({
         articleId: articleChunks.articleId,
@@ -99,6 +101,21 @@ articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     })
 })
 
+
+articles.get('/', async (c) => {
+    const limit = Number(c.req.query('limit')) || 100
+    const offset = Number(c.req.query('offset')) || 0
+
+    const db = c.get('db')
+    const { articles } = c.get('schema')
+
+    const results = await db.select()
+        .from(articles)
+        .limit(limit)
+        .offset(offset)
+
+    return c.json(results)
+})
 
 articles.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetArticleQuerySchema), async (c) => {
     const { id: externalId } = c.req.valid('param')
