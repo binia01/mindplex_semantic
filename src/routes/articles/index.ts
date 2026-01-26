@@ -29,7 +29,8 @@ articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     const db = c.get('db')
     const { articles, articleChunks } = c.get('schema')
     const query = c.req.valid('query')
-    const { q: searchQuery, limit, offset, fields } = query
+    const { q: searchQuery, limit, page, fields } = query
+    const offset = (page - 1) * limit
 
     if (!searchQuery) return c.json({ articles: [] })
 
@@ -104,7 +105,9 @@ articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
 
 articles.get('/', async (c) => {
     const limit = Number(c.req.query('limit')) || 100
-    const offset = Number(c.req.query('offset')) || 0
+    const page = Math.max(1, Number(c.req.query('page')) || 1)
+
+    const offset = (page - 1) * limit
 
     const db = c.get('db')
     const { articles } = c.get('schema')
@@ -112,9 +115,16 @@ articles.get('/', async (c) => {
     const results = await db.select()
         .from(articles)
         .limit(limit)
+        .orderBy(desc(articles.id))
         .offset(offset)
 
-    return c.json(results)
+    return c.json({
+        articles: results,
+        meta: {
+            page: page,
+            limit: limit
+        }
+    })
 })
 
 articles.get('/:id', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetArticleQuerySchema), async (c) => {

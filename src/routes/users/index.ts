@@ -19,7 +19,8 @@ export const getSearchScoreSql = (query: string) => sql`
 `;
 
 users.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
-    const { limit, offset, q: searchQuery } = c.req.valid('query');
+    const { limit, page, q: searchQuery } = c.req.valid('query');
+    const offset = (page - 1) * limit
 
     const db = c.get('db')
     const { users } = c.get('schema')

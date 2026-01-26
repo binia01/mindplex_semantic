@@ -5,7 +5,7 @@ import { createFieldsSchema } from '$src/utils';
 export const FORBIDDEN_COLUMNS = new Set(['embedding', 'searchVector', 'id']);
 export const ALLOWED_UPDATE_FIELDS = new Set(['title', 'teaser', 'content', 'category', 'tags', 'slug'])
 const DEFAULT_LIMIT = "10";
-const DEFAULT_OFFSET = "0";
+const DEFAULT_PAGE = "1";
 const MAX_LIMIT = 100;
 
 export const SearchQuerySchema = v.object({
@@ -20,14 +20,13 @@ export const SearchQuerySchema = v.object({
         ),
         DEFAULT_LIMIT
     ),
-    offset: v.optional(
+    page: v.optional(
         v.pipe(
             v.string(),
             v.transform(Number),
             v.integer(),
-            v.minValue(0)
         ),
-        DEFAULT_OFFSET
+        DEFAULT_PAGE
     ),
     fields: createFieldsSchema(articles, FORBIDDEN_COLUMNS),
 });
