@@ -25,7 +25,8 @@ search.get('/', vValidator('query', SearchQuerySchema), async (c) => {
     const db = c.get('db')
     const { articles, articleChunks } = c.get('schema')
     const query = c.req.valid('query')
-    const { q: searchQuery, limit, offset, fields } = query
+    const { q: searchQuery, limit, page, fields } = query
+    const offset = (page - 1) * limit
 
     if (!searchQuery) return c.json({ articles: [] })
 
