@@ -3,7 +3,7 @@ import { users } from '$src/db/schema'
 import { createFieldsSchema } from '$src/utils'
 
 const DEFAULT_LIMIT = "10"
-const DEFAULT_PAGE = "0"
+const DEFAULT_PAGE = "1"
 const MAX_LIMIT = 100
 
 export const FORBIDDEN_USER_COLUMNS = new Set(['searchName'])
