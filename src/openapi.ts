@@ -76,14 +76,10 @@ Returns articles ranked by relevance score (70% vector, 30% text).
                         }
                     },
                     {
-                        name: 'offset',
+                        name: 'page',
                         in: 'query',
-                        description: 'Number of results to skip (pagination)',
-                        schema: {
-                            type: 'integer',
-                            minimum: 0,
-                            default: 0
-                        }
+                        description: 'Page number (starts at 1)',
+                        schema: { type: 'integer', minimum: 1, default: 1 }
                     },
                     {
                         name: 'fields',
@@ -115,7 +111,7 @@ Returns articles ranked by relevance score (70% vector, 30% text).
                                                 query: { type: 'string' },
                                                 count: { type: 'integer' },
                                                 limit: { type: 'integer' },
-                                                offset: { type: 'integer' }
+                                                page: { type: 'integer' }
                                             }
                                         }
                                     }
@@ -260,6 +256,38 @@ Returns articles ranked by relevance score (70% vector, 30% text).
                 }
             }
         },
+        '/articles/{id}/chunks': {
+            get: {
+                tags: ['Articles'],
+                summary: 'Get article chunks',
+                description: 'Retrieve the processed text segments used for RAG and embeddings.',
+                parameters: [
+                    {
+                        name: 'id',
+                        in: 'path',
+                        required: true,
+                        description: 'External article ID [cite: 260]',
+                        schema: { type: 'integer' }
+                    },
+                    {
+                        name: 'fields',
+                        in: 'query',
+                        description: 'Comma-separated list of fields (e.g., chunkIndex, rawContent, embedding)[cite: 182].',
+                        schema: { type: 'string' }
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'List of article chunks',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/ChunkResponse' }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         '/users/search': {
             get: {
                 tags: ['Users'],
@@ -292,14 +320,10 @@ Searches across first name, last name, username, and email.
                         }
                     },
                     {
-                        name: 'offset',
+                        name: 'page',
                         in: 'query',
-                        description: 'Number of results to skip (pagination)',
-                        schema: {
-                            type: 'integer',
-                            minimum: 0,
-                            default: 0
-                        }
+                        description: 'Page number (starts at 1)',
+                        schema: { type: 'integer', minimum: 1, default: 1 }
                     },
                     {
                         name: 'fields',
@@ -331,7 +355,7 @@ Searches across first name, last name, username, and email.
                                                 query: { type: 'string' },
                                                 count: { type: 'integer' },
                                                 limit: { type: 'integer' },
-                                                offset: { type: 'integer' }
+                                                page: { type: 'integer' }
                                             }
                                         }
                                     }
@@ -684,6 +708,31 @@ This is a heavy operation and may take several seconds.`,
                         items: { type: 'string' }
                     },
                     slug: { type: 'string' }
+                }
+            },
+            ChunkResponse: {
+                type: 'object',
+                properties: {
+                    externalId: { type: 'integer' },
+                    totalChunks: { type: 'integer' },
+                    chunks: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'integer' },
+                                chunkIndex: { type: 'integer' },
+                                rawContent: { type: 'string' },
+                                chunkToEmbed: { type: 'string' },
+                                embedding: {
+                                    type: 'array',
+                                    items: { type: 'number' },
+                                    description: '1024-dimension vector [cite: 260, 262]'
+                                },
+                                updatedAt: { type: 'string', format: 'date-time' }
+                            }
+                        }
+                    }
                 }
             },
             IngestArticle: {
