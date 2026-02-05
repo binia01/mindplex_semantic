@@ -1,44 +1,20 @@
 import * as v from 'valibot'
 import { users } from '$src/db/schema'
 import { createFieldsSchema } from '$src/utils'
-
-const DEFAULT_LIMIT = "10"
-const DEFAULT_PAGE = "1"
-const MAX_LIMIT = 100
+import { PaginationLimitSchema, PaginationPageSchema, IdParamSchema } from '$src/lib/validators'
 
 export const FORBIDDEN_USER_COLUMNS = new Set(['searchName'])
 
 export const ALLOWED_USER_UPDATE_FIELDS = new Set(['firstName', 'lastName', 'username', 'email'])
 
 export const ExternalIdParamsSchema = v.object({
-    id: v.pipe(
-        v.string(),
-        v.transform(Number),
-        v.integer(),
-        v.minValue(1)
-    )
+    id: IdParamSchema
 })
 
 export const SearchQuerySchema = v.object({
     q: v.optional(v.string()),
-    limit: v.optional(
-        v.pipe(
-            v.string(),
-            v.transform(Number),
-            v.integer(),
-            v.minValue(1),
-            v.maxValue(MAX_LIMIT)
-        ),
-        DEFAULT_LIMIT
-    ),
-    page: v.optional(
-        v.pipe(
-            v.string(),
-            v.transform(Number),
-            v.integer(),
-        ),
-        DEFAULT_PAGE
-    ),
+    limit: PaginationLimitSchema,
+    page: PaginationPageSchema,
     fields: createFieldsSchema(users, FORBIDDEN_USER_COLUMNS),
 })
 

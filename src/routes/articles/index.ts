@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { sql, eq, gt, desc } from 'drizzle-orm'
-import { ALLOWED_UPDATE_FIELDS, ExternalIdParamsSchema, GetArticleQuerySchema, SearchQuerySchema, UpdateArticleSchema } from './schema'
+import { ALLOWED_UPDATE_FIELDS, ExternalIdParamsSchema, GetArticleQuerySchema, GetChunksQuerySchema, SearchQuerySchema, UpdateArticleSchema } from './schema'
 
 import type { AppContext } from '$src/types'
 import { vValidator } from '@hono/valibot-validator'
@@ -102,7 +102,6 @@ articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     })
 })
 
-
 articles.get('/', async (c) => {
     const limit = Number(c.req.query('limit')) || 100
     const page = Math.max(1, Number(c.req.query('page')) || 1)
@@ -202,6 +201,39 @@ articles.delete('/:id', vValidator('param', ExternalIdParamsSchema), async (c) =
 
     return c.json({ message: 'Article deleted successfully', externalId })
 })
+articles.get('/:id/chunks', vValidator('param', ExternalIdParamsSchema), vValidator('query', GetChunksQuerySchema), async (c) => {
+    const { id: externalId } = c.req.valid('param');
+    const { fields } = c.req.valid('query');
+    const db = c.get('db');
+    const { articles, articleChunks } = c.get('schema');
+
+    const [article] = await db.select({
+        id: articles.id,
+    })
+        .from(articles)
+        .where(eq(articles.externalId, externalId));
+
+    if (!article) return c.json({ error: 'Article not found' }, 404);
+
+    const selection = buildFieldSelection(
+        articleChunks,
+        fields,
+        new Set([]),
+        { id: articleChunks.id }
+    );
+
+    const chunks = await db.select(selection)
+        .from(articleChunks)
+        .where(eq(articleChunks.articleId, article.id))
+        .orderBy(articleChunks.chunkIndex);
+
+    return c.json({
+        externalId,
+        // articleEmbedding: article.embedding,
+        totalChunks: chunks.length,
+        chunks
+    });
+});
 
 
 export default articles
