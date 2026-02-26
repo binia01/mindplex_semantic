@@ -30,6 +30,11 @@ export const UpdateArticleSchema = v.object({
     tags: v.optional(v.array(v.string())),
 });
 
+export const RelatedArticlesQuerySchema = v.object({
+    limit: PaginationLimitSchema,
+    fields: createFieldsSchema(articles, FORBIDDEN_COLUMNS),
+});
+
 export const GetChunksQuerySchema = v.object({
     fields: createFieldsSchema(articleChunks, new Set([])),
 });
