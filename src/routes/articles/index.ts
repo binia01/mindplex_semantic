@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { sql, eq, gt, desc, and, ne, asc, lt } from 'drizzle-orm'
-import { ALLOWED_UPDATE_FIELDS, ExternalIdParamsSchema, GetArticleQuerySchema, GetChunksQuerySchema, SearchQuerySchema, UpdateArticleSchema, RelatedArticlesQuerySchema } from './schema'
+import { ALLOWED_UPDATE_FIELDS, ExternalIdParamsSchema, GetArticleQuerySchema, GetChunksQuerySchema, SearchQuerySchema, UpdateArticleSchema, RelatedArticlesQuerySchema, GetSummaryQuerySchema } from './schema'
 
 import type { AppContext } from '$src/types'
 import { vValidator } from '@hono/valibot-validator'
@@ -24,6 +24,34 @@ export const getHybridScoreSql = (
     return sql`(${vectorScore} * 0.5) + (${normalizedTextScore} * 0.5)`
 }
 
+
+articles.get('/summary', vValidator('query', GetSummaryQuerySchema), async (c) => {
+    const { content_id, tone } = c.req.valid('query')
+    const db = c.get('db')
+    const { summaries, articles: articleTable } = c.get('schema')
+
+    const summaryData = await db
+        .select({
+            content_id: articleTable.externalId,
+            tone: summaries.tone,
+            summary: summaries.summary
+        })
+        .from(summaries)
+        .innerJoin(articleTable, eq(summaries.articleId, articleTable.id))
+        .where(
+            and(
+                eq(articleTable.externalId, content_id),
+                eq(summaries.tone, tone)
+            )
+        )
+        .limit(1)
+
+    if (summaryData.length === 0) {
+        return c.json({ error: 'Summary not found' }, 404)
+    }
+
+    return c.json(summaryData[0])
+})
 
 articles.get('/search', vValidator('query', SearchQuerySchema), async (c) => {
     const db = c.get('db')
