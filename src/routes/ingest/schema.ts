@@ -34,11 +34,4 @@ export const IngestUserSchema = v.object({
     email: v.string(),
 });
 
-export const IngestSummarySchema = v.object({
-    content_id: v.union([
-        v.number(),
-        v.pipe(v.string(), v.transform(Number))
-    ]),
-    tone: v.string(),
-    summary: v.string(),
-});
+

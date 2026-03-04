@@ -5,7 +5,7 @@ import { AppContext } from '$src/types'
 import { toNames } from '$src/utils'
 import { eq } from 'drizzle-orm'
 import { vValidator } from '@hono/valibot-validator';
-import { IngestArticleSchema, IngestUserSchema, IngestSummarySchema } from './schema';
+import { IngestArticleSchema, IngestUserSchema } from './schema';
 
 const ingest = new Hono<AppContext>()
 
@@ -111,48 +111,5 @@ ingest.post('/users', vValidator('json', IngestUserSchema), async (c) => {
     }
 })
 
-ingest.post('/summary', vValidator('json', IngestSummarySchema), async (c) => {
-    const body = c.req.valid('json');
-    const db = c.get('db');
-    const schema = c.get('schema');
-
-    try {
-        const article = await db.query.articles.findFirst({
-            where: eq(schema.articles.externalId, body.content_id),
-            columns: { id: true }
-        });
-
-        if (!article) {
-            return c.json({ success: false, error: 'Article not found' }, 404);
-        }
-
-        let embeddingData = null;
-        if (body.tone.toLowerCase() === 'formal') {
-            const embeddingService = new Embedding();
-            embeddingData = await embeddingService.getEmbeddings(body.summary);
-        }
-
-        await db.insert(schema.summaries)
-            .values({
-                articleId: article.id,
-                tone: body.tone,
-                summary: body.summary,
-                embedding: embeddingData
-            })
-            .onConflictDoUpdate({
-                target: [schema.summaries.articleId, schema.summaries.tone],
-                set: {
-                    summary: body.summary,
-                    embedding: embeddingData,
-                    updatedAt: new Date()
-                }
-            });
-
-        return c.json({ success: true, message: 'Summary added successfully' });
-    } catch (error) {
-        console.error('Error adding summary:', error);
-        return c.json({ success: false, error: 'Failed to add summary' }, 500);
-    }
-});
 
 export default ingest 
