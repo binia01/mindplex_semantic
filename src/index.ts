@@ -13,6 +13,7 @@ import ingest from '$src/routes/ingest'
 
 import { openApiDoc } from './openapi'
 import { AppContext } from '$src/types'
+import { AppError } from '$src/lib/errors'
 
 const app = new Hono<AppContext>()
 const urlObj = new URL(process.env.DATABASE_URL || '');
@@ -66,5 +67,21 @@ app.get('/health', async (c) => {
     return c.json({ error: 'Failed to check database health ' + msg }, 500);
   }
 })
+
+app.onError((err, c) => {
+  if (err instanceof AppError) {
+    return c.json({
+      success: false,
+      error: err.message,
+      details: err.details
+    }, err.statusCode as any);
+  }
+
+  console.error("Unhandled Exception:", err);
+  return c.json({
+    success: false,
+    error: 'Internal Server Error'
+  }, 500);
+});
 
 export default app
