@@ -2,8 +2,8 @@ name: Build and Push Docker
 
 on:
   push:
-    branches:
-      - "dev/**"
+    branches-ignore:
+      - "main"
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
