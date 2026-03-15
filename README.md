@@ -1,126 +1,80 @@
 # Mindplex Semantic
 
-Search and AI infrastructure for Mindplex powering vector search, related articles, fuzzy user lookup, and conversational AI over published content.
+Mindplex Semantic is the search and indexing service behind article discovery, fuzzy user lookup, chunk retrieval, and tone-specific article summaries.
 
-## Features
+## Stack
 
-- **Article Search** - Vector similarity search across article content
-- **Related Articles** - Find similar articles using embedding similarity
-- **User Search** - Fuzzy search with typo tolerance (pg_trgm)
-- **RAG Chat** - Chat with article content (retrieval augmented generation)
+- Bun + Hono for the API
+- PostgreSQL 16 with `pgvector` and `pg_trgm`
+- Drizzle ORM for schema and migrations
+- Redis for embedding cache
+- AWS Bedrock Titan v2 embeddings
 
-## Architecture
+## API conventions
 
-```mermaid
+- All public endpoints live under `/v1`.
+- Resource lookups use external IDs in the path, for example `/v1/articles/:id`.
+- `fields` can be used on read endpoints to limit the returned columns.
+- `GET /v1/summaries` returns all summaries with pagination.
+- Article summaries are article-scoped resources:
+  - `GET /v1/articles/:id/summaries`
+  - `GET /v1/articles/:id/summaries/:tone`
+  - `PUT /v1/articles/:id/summaries/:tone`
 
-flowchart TB
-    subgraph UserSearch["User Search (pg_trgm)"]
-        UQ[/"User types: 'ben mezrik'"/]
-        UQ --> TRGM["Break into trigrams"]
-        TRGM --> TGRAMS["{ ben, en , n m, mez, ezr, zri, rik }"]
-        TGRAMS --> COMPARE["Compare against stored trigrams"]
-        COMPARE --> USCORE["Score by overlap %"]
-        USCORE --> URES[/"Ben Mezrich (92% match)"/]
-    end
+See [docs/api.md](docs/api.md) for the endpoint reference.
 
-    subgraph ContentSearch["Article Search (pgvector)"]
-        AQ[/"User asks: 'What did Ben write about AI?'"/]
-        AQ --> EMBED["Embed query via OpenAI"]
-        EMBED --> QVEC["[0.23, -0.45, 0.87, ...]"]
-        QVEC --> VCOMPARE["Calculate distance to all chunk vectors"]
-        VCOMPARE --> VSCORE["Rank by cosine similarity"]
-        VSCORE --> VRES[/"Top 5 relevant chunks"/]
-    end
+## Local setup
 
-    subgraph Database["PostgreSQL"]
-        USERS[(users table)]
-        CHUNKS[(article_chunks table)]
-        
-        USERS --> |"search_name + GIN index"| TRGM_IDX["pg_trgm index"]
-        CHUNKS --> |"embedding column"| VEC_IDX["pgvector HNSW index"]
-    end
-
-    COMPARE --> TRGM_IDX
-    VCOMPARE --> VEC_IDX
-
-    subgraph DataFlow["Data Ingestion"]
-        MAIN["Main Backend"]
-        HONO["Hono Embedding Service"]
-        
-        MAIN -->|"POST /embed\n{article + metadata}"| HONO
-        HONO -->|"1. Chunk article"| CHUNK["Split into ~500 token chunks"]
-        CHUNK -->|"2. Prepend metadata"| ENRICH["Add title, author, date to each chunk"]
-        ENRICH -->|"3. Embed"| OPENAI["OpenAI text-embedding-3-small"]
-        OPENAI -->|"4. Store"| CHUNKS
-    end
-```
-
-## Tech Stack
-
-- **Runtime** - Bun
-- **Framework** - Hono
-- **Database** - PostgreSQL 16
-- **ORM** - Drizzle
-- **Vector Search** - pgvector
-- **Fuzzy Search** - pg_trgm
-- **Embeddings** - OpenAI text-embedding-3-small
-
-## Setup
+1. Install dependencies:
 
 ```bash
-# Install dependencies
 bun install
+```
 
-# Copy env
-cp .env.example .env
-# Add your OPENAI_API_KEY
+2. Start PostgreSQL and Redis:
 
-# Start database
-docker compose up db -d
+```bash
+docker compose -f Docker-compose.yml up -d db redis
+```
 
-# Create extensions
-docker exec mindplex_semantic-db-1 psql -U mindplex -d semantic -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+3. Set environment variables in `.env`:
 
-# Run migrations
-bunx drizzle-kit push
+```bash
+DATABASE_URL=postgres://mindplex:mindplex@localhost:5432/semantic
+REDIS_URL=redis://localhost:6379
+AWS_BEDROCK_ACCESS_KEY=...
+AWS_BEDROCK_SECRET_KEY=...
+AWS_REGION=us-east-1
+```
 
-# Start dev server
+4. Bootstrap the database and extensions:
+
+```bash
+bun run db:setup
+```
+
+5. Apply migrations:
+
+```bash
+bun run db:dev-migrate
+```
+
+6. Run the API:
+
+```bash
 bun run dev
 ```
 
+## Useful endpoints
 
-## How It Works
+- `GET /health` for the health check
+- `GET /doc` for the raw OpenAPI document
+- `GET /ui` for the interactive API reference
 
-### Article Embedding
+## Data flows
 
-1. Article received with title, teaser, content
-2. Title + teaser → embedded → stored on `articles.embedding` (for related)
-3. Content → chunked (~500 tokens) → each chunk embedded → stored in `article_chunks`
+- `POST /v1/ingest/articles` stores article metadata, generates embeddings, and writes searchable chunks.
+- `POST /v1/ingest/users` stores users for fuzzy lookup.
+- `PUT /v1/articles/:id/summaries/:tone` stores or replaces a summary for a given article and tone.
 
-```
-DATABASE_URL=postgres://mindplex:mindplex@localhost:5432/semantic
-OPENAI_API_KEY=sk-...
-```
-
-## Docker
-
-```bash
-# Start everything
-docker compose up
-
-# Start only db
-docker compose up db -d
-
-# Run studio
-bunx drizzle-kit studio
-```
-
-## Future: Event Bus Integration
-
-Currently uses direct HTTP calls. Will integrate RabbitMQ for:
-
-- `article.published` → embed + store
-- `article.updated` → re-embed
-- `article.deleted` → remove chunks
-- `user.created` → sync user
-- `user.updated` → update search_name
+Only the `formal` summary tone generates and stores an embedding today.

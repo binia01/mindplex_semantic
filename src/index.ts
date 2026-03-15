@@ -14,6 +14,7 @@ import ingest from '$src/routes/ingest'
 import { openApiDoc } from './openapi'
 import { AppContext } from '$src/types'
 import { AppError } from '$src/lib/errors'
+import articleSummaries, { summaryCollection } from '$src/routes/summary'
 
 const app = new Hono<AppContext>()
 const urlObj = new URL(process.env.DATABASE_URL || '');
@@ -42,6 +43,8 @@ app.get('/ui', Scalar({ url: '/doc' }))
 
 app.route('/v1/ingest', ingest)
 app.route('/v1/articles', articles)
+app.route('/v1/articles/:id/summaries', articleSummaries)
+app.route('/v1/summaries', summaryCollection)
 app.route('/v1/search', search)
 app.route('/v1/users', usersRoute)
 

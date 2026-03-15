@@ -1,3 +1,5 @@
+import { availableTones } from '$src/db/schema'
+
 export const openApiDoc = {
     openapi: '3.0.3',
     info: {
@@ -7,6 +9,7 @@ export const openApiDoc = {
 **Features:**
 - Hybrid semantic search for articles (vector + full-text)
 - Fuzzy text search for users
+- Tone-specific article summaries
 - Field selection for optimized responses
 - RESTful CRUD operations`,
         version: '1.0.0',
@@ -37,6 +40,10 @@ export const openApiDoc = {
         {
             name: 'Users',
             description: 'User search and management'
+        },
+        {
+            name: 'Summaries',
+            description: 'Article summary retrieval and upserts by tone'
         },
         {
             name: 'Ingest',
@@ -266,13 +273,13 @@ Returns articles ranked by relevance score (70% vector, 30% text).
                         name: 'id',
                         in: 'path',
                         required: true,
-                        description: 'External article ID [cite: 260]',
+                        description: 'External article ID',
                         schema: { type: 'integer' }
                     },
                     {
                         name: 'fields',
                         in: 'query',
-                        description: 'Comma-separated list of fields (e.g., chunkIndex, rawContent, embedding)[cite: 182].',
+                        description: 'Comma-separated list of fields (e.g., chunkIndex, rawContent, embedding).',
                         schema: { type: 'string' }
                     }
                 ],
@@ -622,7 +629,249 @@ This is a heavy operation and may take several seconds.`,
                     }
                 }
             }
-        }
+        },
+        '/summaries': {
+            get: {
+                tags: ['Summaries'],
+                summary: 'List summaries',
+                description: 'List all summaries across articles with pagination and optional tone filtering.',
+                operationId: 'listSummaries',
+                parameters: [
+                    {
+                        name: 'limit',
+                        in: 'query',
+                        description: 'Maximum number of results',
+                        schema: {
+                            type: 'integer',
+                            minimum: 1,
+                            maximum: 100,
+                            default: 10
+                        }
+                    },
+                    {
+                        name: 'page',
+                        in: 'query',
+                        description: 'Page number (starts at 1)',
+                        schema: {
+                            type: 'integer',
+                            minimum: 1,
+                            default: 1
+                        }
+                    },
+                    {
+                        name: 'tone',
+                        in: 'query',
+                        description: 'Optional tone filter',
+                        schema: {
+                            type: 'string',
+                            enum: availableTones
+                        }
+                    },
+                    {
+                        name: 'fields',
+                        in: 'query',
+                        description: 'Comma-separated list of fields to return',
+                        schema: {
+                            type: 'string',
+                            example: 'summary,updatedAt'
+                        }
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Paginated summaries',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/PaginatedSummaryListResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        $ref: '#/components/responses/BadRequest'
+                    }
+                }
+            }
+        },
+        '/articles/{id}/summaries': {
+            get: {
+                tags: ['Summaries'],
+                summary: 'List article summaries',
+                description: 'List all available summaries for an article external ID.',
+                operationId: 'listArticleSummaries',
+                parameters: [
+                    {
+                        name: 'id',
+                        in: 'path',
+                        required: true,
+                        description: 'Article external ID',
+                        schema: {
+                            type: 'integer'
+                        }
+                    },
+                    {
+                        name: 'fields',
+                        in: 'query',
+                        description: 'Comma-separated list of fields to return',
+                        schema: {
+                            type: 'string',
+                            example: 'summary,createdAt'
+                        }
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Summaries found',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/SummaryListResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        $ref: '#/components/responses/BadRequest'
+                    },
+                    '404': {
+                        $ref: '#/components/responses/NotFound'
+                    }
+                }
+            }
+        },
+        '/articles/{id}/summaries/{tone}': {
+            get: {
+                tags: ['Summaries'],
+                summary: 'Get article summary by tone',
+                description: 'Retrieve a single summary for an article external ID and tone.',
+                operationId: 'getArticleSummary',
+                parameters: [
+                    {
+                        name: 'id',
+                        in: 'path',
+                        required: true,
+                        description: 'Article external ID',
+                        schema: {
+                            type: 'integer'
+                        }
+                    },
+                    {
+                        name: 'tone',
+                        in: 'path',
+                        required: true,
+                        description: 'Summary tone',
+                        schema: {
+                            type: 'string',
+                            enum: availableTones
+                        }
+                    },
+                    {
+                        name: 'fields',
+                        in: 'query',
+                        description: 'Comma-separated list of fields to return',
+                        schema: {
+                            type: 'string',
+                            example: 'summary,updatedAt'
+                        }
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Summary found',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/Summary'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        $ref: '#/components/responses/BadRequest'
+                    },
+                    '404': {
+                        $ref: '#/components/responses/NotFound'
+                    }
+                }
+            },
+            put: {
+                tags: ['Summaries'],
+                summary: 'Create or update article summary',
+                description: 'Idempotently create or replace the summary for an article external ID and tone.',
+                operationId: 'upsertArticleSummary',
+                parameters: [
+                    {
+                        name: 'id',
+                        in: 'path',
+                        required: true,
+                        description: 'Article external ID',
+                        schema: {
+                            type: 'integer'
+                        }
+                    },
+                    {
+                        name: 'tone',
+                        in: 'path',
+                        required: true,
+                        description: 'Summary tone',
+                        schema: {
+                            type: 'string',
+                            enum: availableTones
+                        }
+                    }
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/UpsertSummaryRequest'
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    '200': {
+                        description: 'Summary updated successfully',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/SummaryWriteResponse'
+                                }
+                            }
+                        }
+                    },
+                    '201': {
+                        description: 'Summary created successfully',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/SummaryWriteResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        $ref: '#/components/responses/BadRequest'
+                    },
+                    '404': {
+                        $ref: '#/components/responses/NotFound'
+                    },
+                    '502': {
+                        description: 'Embedding service failed',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/Error'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+       
     },
     components: {
         schemas: {
@@ -727,7 +976,7 @@ This is a heavy operation and may take several seconds.`,
                                 embedding: {
                                     type: 'array',
                                     items: { type: 'number' },
-                                    description: '1024-dimension vector [cite: 260, 262]'
+                                    description: '1024-dimension vector'
                                 },
                                 updatedAt: { type: 'string', format: 'date-time' }
                             }
@@ -790,6 +1039,98 @@ This is a heavy operation and may take several seconds.`,
                                 ]
                             }
                         }
+                    }
+                }
+            },
+            Summary: {
+                type: 'object',
+                required: ['articleExternalId', 'tone'],
+                properties: {
+                    articleExternalId: {
+                        type: 'integer',
+                        description: 'Article external ID'
+                    },
+                    tone: {
+                        type: 'string',
+                        enum: availableTones
+                    },
+                    summary: {
+                        type: 'string',
+                        description: 'Stored summary text'
+                    },
+                    createdAt: {
+                        type: 'string',
+                        format: 'date-time'
+                    },
+                    updatedAt: {
+                        type: 'string',
+                        format: 'date-time'
+                    }
+                }
+            },
+            SummaryListResponse: {
+                type: 'object',
+                required: ['summaries'],
+                properties: {
+                    summaries: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/components/schemas/Summary'
+                        }
+                    }
+                }
+            },
+            PaginatedSummaryListResponse: {
+                type: 'object',
+                required: ['summaries', 'meta'],
+                properties: {
+                    summaries: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/components/schemas/Summary'
+                        }
+                    },
+                    meta: {
+                        type: 'object',
+                        required: ['page', 'limit', 'count', 'total'],
+                        properties: {
+                            page: {
+                                type: 'integer'
+                            },
+                            limit: {
+                                type: 'integer'
+                            },
+                            count: {
+                                type: 'integer',
+                                description: 'Number of summaries returned in the current page'
+                            },
+                            total: {
+                                type: 'integer',
+                                description: 'Total number of summaries matching the filter'
+                            }
+                        }
+                    }
+                }
+            },
+            UpsertSummaryRequest: {
+                type: 'object',
+                required: ['summary'],
+                properties: {
+                    summary: {
+                        type: 'string',
+                        description: 'Summary text to store for the selected tone'
+                    }
+                }
+            },
+            SummaryWriteResponse: {
+                type: 'object',
+                required: ['message', 'summary'],
+                properties: {
+                    message: {
+                        type: 'string'
+                    },
+                    summary: {
+                        $ref: '#/components/schemas/Summary'
                     }
                 }
             },
@@ -911,6 +1252,11 @@ This is a heavy operation and may take several seconds.`,
                             userNotFound: {
                                 value: {
                                     error: 'User not found'
+                                }
+                            },
+                            summaryNotFound: {
+                                value: {
+                                    error: 'Summary not found'
                                 }
                             }
                         }
