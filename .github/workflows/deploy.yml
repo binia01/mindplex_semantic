@@ -1,43 +1,40 @@
-name: Build and Push Docker
+name: Build and Push Docker on Approval
 
 on:
-    push:
-        branches: ["main"]
-    pull_request:
-        branches: ["main"]
+  pull_request_review:
+    types: [submitted]
 
 jobs:
-    build-and-push:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout Code
-              uses: actions/checkout@v3
+  build-and-push:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
 
-            - name: Configure AWS Credentials
-              uses: aws-actions/configure-aws-credentials@v2
-              with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: us-east-1
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-            - name: Login to Amazon ECR
-              id: login-ecr
-              uses: aws-actions/amazon-ecr-login@v1
+      - name: Set image tag
+        id: tag
+        run: echo "image_tag=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-            - name: Set Image Tag
-              id: tag
-              run: |
-                  if [ "${{ github.event_name }}" == "pull_request" ]; then
-                      echo "IMAGE_TAG=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-                  else
-                      echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
-                  fi
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-            - name: Build and Push
-              env:
-                  ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-                  ECR_REPOSITORY: mindplex-semantic
-                  IMAGE_TAG: ${{ steps.tag.outputs.IMAGE_TAG }}
-              run: |
-                  docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-                  docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: mindplex-semantic
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG

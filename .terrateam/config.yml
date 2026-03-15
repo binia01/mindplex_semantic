@@ -13,8 +13,15 @@ dirs:
       autoapply: false
 
 apply_requirements:
+  create_pending_apply_check: true
   checks:
-    - tag_query: "" 
+    - tag_query: "dev"
+      approved:
+        enabled: true
+        any_of: []
+        any_of_count: 1
+      merge_conflicts:
+        enabled: true
       status_checks:
         enabled: true
 
@@ -23,7 +30,7 @@ hooks:
     pre:
       - type: env
         name: TF_VAR_image_tag
-        cmd: ["sh", "-c", "echo $GITHUB_SHA"]
+        cmd: ["sh", "-c", "git rev-parse HEAD"]
     post:
       - type: run
         run_on: failure
